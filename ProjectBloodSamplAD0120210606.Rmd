@@ -1,0 +1,295 @@
+---
+title: "ProjektAD01"
+author: "Agnieszka Domeracka"
+date: "`r Sys.Date()`"
+output: 
+html_document:
+  toc: yes
+  toc_float: true
+  theme: spacelab
+  # toc_depth: 3
+  number_sections: yes
+
+---
+
+```{r libraries, include = FALSE}
+library(openxlsx)
+library(knitr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(zoo)
+library(plyr)
+library(ggsci)
+library(mlbench)
+library(caret)
+library(stats)
+opts_chunk$set( echo = FALSE , warning=FALSE)
+```
+# Libraries list
+```{r liblist, results='show'}
+sinf <- sessionInfo()
+print(sinf, RNG = FALSE , locale = FALSE, packages=TRUE)
+```
+```{r powtdanych, echo=FALSE, results='hide'}
+rm(list=ls()) #powtarzalność danych
+```
+## Analysis summary
+
+The world is struggling with COVID-19 epidemic since December 2019. The virus causes severe respiratory complications, which, can lead to patient death. The number of deaths increase sharply with age. However, the young are also at risk. 
+White blood cells are responsible of human immune system. The main task of whit blood cells is to protect the body against infections and diseases. The aim analysis presented below is to investigate the influence of number or percentage of white blood cells group, including neutrophils and lymphocyte.
+The author analyzed the blood samples of 375 patients from the region of Wuhan, China to identify mortality risk on the basis of different white blood cells types percentage in blood.
+
+```{r loaddata, cache=TRUE, echo=FALSE, results='hide'}
+# Wczytywanie danych z pliku
+#inputrawdata<-read.xlsx('http://www.cs.put.poznan.pl/dbrzezinski/teaching/zed/wuhan_blood_sample_data_Jan_Feb_2020.xlsx',colNames = TRUE)
+
+inputrawdata<-read.xlsx('C:/Users/adome/Desktop/Programowanie w R projekt/wuhan_blood_sample_data_Jan_Feb_2020.xlsx',colNames = TRUE)
+```
+
+```{r processdata, echo=FALSE, results='hide'}
+
+# Przetwarzanie danych
+
+processeddata<-inputrawdata
+#processeddata$Admission.time<- as.POSIXct(processeddata$Admission.time, origin="1970-01-01", tz="GMT")
+#processeddata$Discharge.time<- as.POSIXct(processeddata$Discharge.time, origin="1970-01-01", tz="GMT")
+#processeddata$RE_DATE<- as.POSIXct(processeddata$RE_DATE, origin="1970-01-01", tz="GMT")
+
+#Klasy kolumn
+sapply(processeddata, class)
+
+#Zamiana wartości na bardziej czytelne
+
+processeddata$gender[processeddata$gender==1] <- "Male"
+processeddata$gender[processeddata$gender==2] <- "Female"
+
+processeddata$outcome[processeddata$outcome==0] <- "Survived"
+processeddata$outcome[processeddata$outcome==1] <- "Died"
+
+
+
+```
+
+```{r patientsinfo}
+
+#Informacje opacjentach
+patients_info<-filter(processeddata, PATIENT_ID > 0)
+patients_info<- select(patients_info, PATIENT_ID, RE_DATE, age, gender, outcome)
+
+```
+
+```{r fillID}
+#Uzupelnianie ID pajentow w pomiarach
+processeddata <- fill(processeddata, PATIENT_ID)
+
+```
+
+```{r lastsamplesdata, results='hide'}
+require(data.table)
+group <- as.data.table(processeddata)
+
+
+ samplelastdate<-group %>% group_by(PATIENT_ID) %>% top_n(1, RE_DATE)
+
+```
+```{r prdata}
+
+pr<- select(processeddata, PATIENT_ID, RE_DATE, age, gender, outcome, `neutrophils(%)`,`(%)lymphocyte`)
+pr<-filter(pr, `neutrophils(%)`>0, `(%)lymphocyte`>0 )
+
+
+#for(i in 8:81) {
+ 
+#colname<- colnames(inputrawdata)[i]
+
+#d<-processeddata %>% 
+#    group_by(PATIENT_ID) %>%
+#    mutate(
+ #       first = dplyr::first(colname),
+ #       last = dplyr::last(colname)
+#    )
+
+#}
+
+prgr<-pr %>% group_by(PATIENT_ID) %>% top_n(1, RE_DATE)
+```
+## Input data summary
+### Dimensions
+```{r datasummary1}
+knitr::kable(dim(processeddata))
+knitr::kable(summary(processeddata[-1:-7]))
+
+```
+### Parameters list:
+```{r datasummary2}
+colnames(processeddata)
+```
+
+
+### Atributes analysis
+```{r datasummary3}
+sredniwiekpacjenta<- mean(patients_info$age) 
+najstarszypacjent<-max(patients_info$age) 
+najmlodszypacjent<-min(patients_info$age)  
+
+outcometab<-table(patients_info$outcome)
+
+#gendertab<-table(patients_info$gender)
+#rownames(gendertab) <- c("Mezczyzni", "Kobiety")
+
+genderoutcometab<-table(patients_info$gender,patients_info$outcome)
+#colnames(genderoutcometab) <- c("Ozdrowieńcy", "Zgony")
+#rownames(genderoutcometab) <- c("Mezczyzni", "Kobiety")
+```
+
+
+Average patients age: **`r round(sredniwiekpacjenta,0)`**
+
+The oldest patient: **`r round(najstarszypacjent,0)`**
+
+The youngest patient: **`r round(najmlodszypacjent,0)`**
+
+Number of survived : **`r outcometab["Survived"]`**
+
+Number of deaths: **`r outcometab["Died"]`**
+
+
+**`r knitr::kable(genderoutcometab, "simple") `**
+
+### Patients information
+```{r patientsgraphs}
+# Add mean line
+#p<-ggplot(patients_info, aes(age), color=factor(gender)) + geom_histogram(binwidth = 0.9)+geom_density(alpha=.2, fill="#FF6666") 
+mu <- ddply(patients_info, "gender", summarise, averageage=mean(age))
+
+p<-ggplot(patients_info, aes(x=age, color=factor(gender))) +geom_histogram(binwidth = 0.9, fill="white", position="dodge")+ xlab("Patient age") + ggtitle("Patients age and gender") 
+p+geom_vline(data=mu, aes(xintercept=averageage, color=factor(gender)),linetype="dashed")
+#colnames(mu)<- c("Płeć", "Średni wiek")
+
+rownames(mu)<- c("Male", "Female")
+kable(head(mu))
+
+```
+
+
+## Blood samples analysis
+
+```{r bloodsamplesaggr}
+
+wbcmean<-aggregate(`White.blood.cell.count` ~ PATIENT_ID + gender+outcome, data = processeddata, FUN = mean, na.rm = TRUE)
+
+lymphocyte<-aggregate(`(%)lymphocyte` ~ PATIENT_ID + gender+outcome, data = processeddata, FUN = mean, na.rm = TRUE)
+
+neutrophils<-aggregate(`neutrophils(%)` ~ PATIENT_ID + gender+outcome, data = processeddata, FUN = mean, na.rm = TRUE)
+```
+
+
+```{r whitebloodcount}
+### średnia iczba białych krwinek  wszystkich badań pacjentów
+p2<-ggplot(wbcmean, aes(`White.blood.cell.count`, color=factor(outcome))) +geom_histogram(binwidth = 1, fill="white", position="dodge")+xlab("White.blood.cell.count") + ylab("Count") + ggtitle("Average number of white blood cells for dead and survived") + geom_vline(aes(xintercept=4), linetype="dashed")+geom_vline(aes(xintercept=10), linetype="dashed")
+
+plot(p2)
+```
+
+
+```{r wbcmean}
+ p6<-ggplot(data=wbcmean, aes(x=outcome, y=White.blood.cell.count, fill=gender)) + geom_bar(stat="identity")+xlab("White.blood.cell.count") + ylab("Count") + ggtitle("Average number of white blood cells of dead and survived (for male and female)") 
+p6
+
+
+
+```
+
+
+
+
+```{r lymphocyte}
+p3<-ggplot(lymphocyte, aes(`(%)lymphocyte`, color=factor(outcome))) +geom_histogram(binwidth = 1, fill="white", position="dodge")+xlab("Lymphocytes in % of white blood cells") + ylab("Count") + ggtitle("Percentage value of the lymphocyte in all white blood cells") + geom_vline(aes(xintercept=10), linetype="dashed")+geom_vline(aes(xintercept=45), linetype="dashed")
+
+plot(p3)
+
+
+```
+
+#### Notice: Normal percentage is between 10-45%
+
+
+```{r neutrophils}
+p4<-ggplot(neutrophils, aes(`neutrophils(%)`, color=factor(outcome))) +geom_histogram(binwidth = 1, fill="white", position="dodge")+xlab("Neutrophils in % of white blood cells") + ylab("Count") + ggtitle("Percentage value of the Neutrophils in all white blood cells") + geom_vline(aes(xintercept=60), linetype="dashed")+geom_vline(aes(xintercept=70), linetype="dashed")
+
+plot(p4)
+```
+
+#### Notiice: Neutrophils - the most numerous group of white blood cells of the immune system. The task of neutrophils is to protect the body against infections and diseases. The norm for neutrophils is 60-70% of all white blood cells
+
+### Male and female, dead and survived in function of age 
+
+```{r intgraph}
+p7 <- ggplot(
+     patients_info,
+     aes(x=age, y=outcome, color=gender)
+  ) + 
+  geom_point(alpha=0.5) + 
+  scale_color_jco() + 
+  theme_bw() +
+  theme(legend.title = element_blank())+ ggtitle("Male and female, dead and survived in function of age ") 
+
+ggplotly(p7)
+
+```
+## Data coralations - Pearson method
+```{r corelation}
+#knitr::kable(cor(processeddata[-1:-7],processeddata$Outcome, method= "pearson",use="pairwise.complete.obs"))
+
+
+corelationp <- matrix(data=NA, nrow=0, ncol=2)
+
+
+  for(i in 8:81){
+    outcome <- dplyr::pull(inputrawdata,7)
+    analyzed_data <- dplyr::pull(inputrawdata,i)
+    currentfactor <- colnames(inputrawdata)[i]
+    corvalue <- cor.test(outcome, analyzed_data)$estimate
+    result <- c(currentfactor, abs(corvalue))
+    corelationp <- rbind(corelationp, result)
+    
+  }
+corelationp <- corelationp[order(corelationp[,2], decreasing=TRUE),]
+
+plot(x <- corelationp[1:12,2], main="Most important factors predicting outcome", ylab="Pearson Correlation")
+
+text(corelationp[1:12,2], labels=corelationp[1:12,1], cex=0.7)
+
+```
+## Creating predictive models with caret
+
+#### Data was divided into training and testing where p=0.75
+
+```{r caret}
+
+
+processeddata$outcome <- factor(as.character(processeddata$outcome))
+ levels(processeddata$outcome)
+
+
+
+set.seed(23)
+
+inTrain <- createDataPartition(y = processeddata$outcome,p = .75,list = FALSE)
+      
+        
+
+training <- processeddata[ inTrain,]
+testing  <- processeddata[-inTrain,]
+
+ggplot(mapping=aes(alpha=0.4)) + 
+ geom_density(aes(outcome, fill="red"), training) + 
+ geom_density(aes(outcome, fill="blue"), testing) + 
+ theme_minimal()+ ggtitle("Training, testing data regression ")
+
+```
+
+#### Notice: Due to the NA values in blood samples it was not possible to apply any caret model (e.g. RF, parRF, bayesglm)
+
