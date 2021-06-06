@@ -3,16 +3,16 @@ title: "ProjektAD01"
 author: "Agnieszka Domeracka"
 date: "`r Sys.Date()`"
 output: 
-html_document:
-  toc: yes
-  toc_float: true
-  theme: spacelab
-  # toc_depth: 3
-  number_sections: yes
+  html_document:
+    toc: true
+    toc_depth: 3
 
 ---
 
 ```{r libraries, include = FALSE}
+
+knitr::opts_chunk$set( echo = FALSE , warning=FALSE)
+
 library(openxlsx)
 library(knitr)
 library(tidyr)
@@ -25,8 +25,14 @@ library(ggsci)
 library(mlbench)
 library(caret)
 library(stats)
-opts_chunk$set( echo = FALSE , warning=FALSE)
+
 ```
+## Abstract
+
+The world is struggling with COVID-19 epidemic since December 2019. The virus causes severe respiratory complications, which, can lead to patient death. The number of deaths increase sharply with age. However, the young are also at risk. 
+White blood cells are responsible of human immune system. The main task of whit blood cells is to protect the body against infections and diseases. The aim analysis presented below is to investigate the influence of number or percentage of white blood cells group, including neutrophils and lymphocyte.
+The author analyzed the blood samples of 375 patients from January 10 to February 18, 2020 from the region of Wuhan, China to identify mortality risk on the basis of different white blood cells types percentage in blood.
+
 # Libraries list
 ```{r liblist, results='show'}
 sinf <- sessionInfo()
@@ -35,11 +41,6 @@ print(sinf, RNG = FALSE , locale = FALSE, packages=TRUE)
 ```{r powtdanych, echo=FALSE, results='hide'}
 rm(list=ls()) #powtarzalność danych
 ```
-## Analysis summary
-
-The world is struggling with COVID-19 epidemic since December 2019. The virus causes severe respiratory complications, which, can lead to patient death. The number of deaths increase sharply with age. However, the young are also at risk. 
-White blood cells are responsible of human immune system. The main task of whit blood cells is to protect the body against infections and diseases. The aim analysis presented below is to investigate the influence of number or percentage of white blood cells group, including neutrophils and lymphocyte.
-The author analyzed the blood samples of 375 patients from the region of Wuhan, China to identify mortality risk on the basis of different white blood cells types percentage in blood.
 
 ```{r loaddata, cache=TRUE, echo=FALSE, results='hide'}
 # Wczytywanie danych z pliku
@@ -116,7 +117,7 @@ pr<-filter(pr, `neutrophils(%)`>0, `(%)lymphocyte`>0 )
 prgr<-pr %>% group_by(PATIENT_ID) %>% top_n(1, RE_DATE)
 ```
 ## Input data summary
-### Dimensions
+### Dataset dimensions
 ```{r datasummary1}
 knitr::kable(dim(processeddata))
 knitr::kable(summary(processeddata[-1:-7]))
@@ -292,4 +293,10 @@ ggplot(mapping=aes(alpha=0.4)) +
 ```
 
 #### Notice: Due to the NA values in blood samples it was not possible to apply any caret model (e.g. RF, parRF, bayesglm)
+
+## Summary
+The main purpose of the analysis was to investigate the white blood composition of death and survived patients. To analyse the mortality of individual patients three parameters were taken into account: number of white cells in blood, percentage of lymphocytes and percentage of neutrophils. The blood tests results were presented in different graphs. The analysis indicate that for patients who died these three parameters were off the scale. The author tried to create an predictive model to forecasts the mortality of patients. Due to the incomplete blood tests the author was not able to apply any model from Caret library. The author tried to apply models like RF, parRF, bayesglm. However the data was divided into training and testing dataset and the regression chart was made.
+
+## Bibliography
+#### Yan, Hai-Tao Zhang, ,,An interpretable mortality prediction model for COVID-19 patients" (https://www.nature.com/articles/s42256-020-0180-7)
 
